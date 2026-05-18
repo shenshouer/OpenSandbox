@@ -159,6 +159,30 @@ def test_docker_runtime_disallows_kubernetes_block():
         AppConfig(server=server_cfg, runtime=runtime_cfg, kubernetes=kubernetes_cfg)
 
 
+def test_docker_runtime_rejects_multiple_workers():
+    """Docker runtime keeps expiration timers in process-local state, so
+    workers > 1 would race on renew_expiration and expire renewed sandboxes
+    early. Reject the combination at config validation time."""
+    server_cfg = ServerConfig(workers=2)
+    runtime_cfg = RuntimeConfig(type="docker", execd_image="busybox:latest")
+    with pytest.raises(ValueError, match="server.workers must be 1"):
+        AppConfig(server=server_cfg, runtime=runtime_cfg)
+
+
+def test_docker_runtime_allows_single_worker():
+    server_cfg = ServerConfig(workers=1)
+    runtime_cfg = RuntimeConfig(type="docker", execd_image="busybox:latest")
+    cfg = AppConfig(server=server_cfg, runtime=runtime_cfg)
+    assert cfg.server.workers == 1
+
+
+def test_kubernetes_runtime_allows_multiple_workers():
+    server_cfg = ServerConfig(workers=4)
+    runtime_cfg = RuntimeConfig(type="kubernetes", execd_image="busybox:latest")
+    cfg = AppConfig(server=server_cfg, runtime=runtime_cfg)
+    assert cfg.server.workers == 4
+
+
 def test_server_config_defaults_include_max_sandbox_timeout():
     server_cfg = ServerConfig()
     assert server_cfg.max_sandbox_timeout_seconds is None

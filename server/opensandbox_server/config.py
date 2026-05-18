@@ -462,7 +462,8 @@ class ServerConfig(BaseModel):
             "runtime) its own informer watch streams to the apiserver. "
             "Default 1 to keep apiserver pressure predictable; bump to 2-8 "
             "based on CPU quota and apiserver capacity. Ignored when "
-            "--reload is set."
+            "--reload is set. Must be 1 when runtime.type = 'docker' "
+            "because Docker expiration timers live in process-local state."
         ),
     )
     limit_concurrency: Optional[int] = Field(
@@ -896,6 +897,21 @@ class AppConfig(BaseModel):
                 raise ValueError("ingress.mode must be 'direct' when runtime.type = 'docker'.")
             if self.secure_runtime is not None and self.secure_runtime.type == "firecracker":
                 raise ValueError( "secure_runtime.type 'firecracker' is only compatible with runtime.type='kubernetes'.")
+            # The Docker service tracks sandbox expirations with in-process
+            # threading.Timer objects keyed by sandbox_id. Each uvicorn worker
+            # would build an independent DockerSandboxService with its own
+            # timers, so a renewal handled by one worker would not cancel the
+            # stale timer in another worker — that worker would still expire
+            # the sandbox at the pre-renewal time. Refuse to start until the
+            # operator either drops back to a single worker or the Docker
+            # runtime grows shared expiration state.
+            if self.server.workers > 1:
+                raise ValueError(
+                    "server.workers must be 1 when runtime.type = 'docker'; "
+                    "Docker expiration timers are per-process, so multiple "
+                    "workers can race on renew_expiration and expire renewed "
+                    "sandboxes early."
+                )
         elif self.runtime.type == "kubernetes":
             if self.kubernetes is None:
                 self.kubernetes = KubernetesRuntimeConfig()
