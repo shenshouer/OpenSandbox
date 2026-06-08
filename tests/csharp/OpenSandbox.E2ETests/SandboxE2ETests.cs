@@ -866,7 +866,7 @@ public class SandboxE2ETests : IClassFixture<SandboxE2ETestFixture>
         AssertModifiedUpdated(beforeUpdate.ModifiedAt, afterUpdate.ModifiedAt, 1, 1000);
 
         await Task.Delay(50);
-        var replaceResults = await sandbox.Files.ReplaceContentsAsync(new[]
+        var replaceResults = await sandbox.Files.ReplaceContentsDetailedAsync(new[]
         {
             new ContentReplaceEntry
             {
@@ -884,7 +884,7 @@ public class SandboxE2ETests : IClassFixture<SandboxE2ETestFixture>
         Assert.DoesNotContain("Appended line.", replaced, StringComparison.Ordinal);
 
         // No match → ReplacedCount=0
-        var noMatchResults = await sandbox.Files.ReplaceContentsAsync(new[]
+        var noMatchResults = await sandbox.Files.ReplaceContentsDetailedAsync(new[]
         {
             new ContentReplaceEntry { Path = testFile1, OldContent = "nonexistent string", NewContent = "irrelevant" }
         });
@@ -896,7 +896,7 @@ public class SandboxE2ETests : IClassFixture<SandboxE2ETestFixture>
         {
             new WriteEntry { Path = $"{testDir1}/multi.txt", Data = "foo bar foo baz foo" }
         });
-        var multiResults = await sandbox.Files.ReplaceContentsAsync(new[]
+        var multiResults = await sandbox.Files.ReplaceContentsDetailedAsync(new[]
         {
             new ContentReplaceEntry { Path = $"{testDir1}/multi.txt", OldContent = "foo", NewContent = "qux" }
         });

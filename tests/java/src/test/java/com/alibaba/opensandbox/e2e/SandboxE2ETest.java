@@ -1342,7 +1342,7 @@ public class SandboxE2ETest extends BaseE2ETest {
         } catch (InterruptedException ignored) {
         }
         var replaceResults = sandbox.files()
-                .replaceContents(
+                .replaceContentsDetailed(
                         List.of(
                                 ContentReplaceEntry.builder()
                                         .path(testFile1)
@@ -1359,7 +1359,7 @@ public class SandboxE2ETest extends BaseE2ETest {
         assertModifiedUpdated(beforeReplace.getModifiedAt(), afterReplace.getModifiedAt(), 1, 1000);
 
         // No match → replacedCount=0
-        var noMatchResults = sandbox.files().replaceContents(List.of(
+        var noMatchResults = sandbox.files().replaceContentsDetailed(List.of(
                 ContentReplaceEntry.builder()
                         .path(testFile1)
                         .oldContent("nonexistent string")
@@ -1371,7 +1371,7 @@ public class SandboxE2ETest extends BaseE2ETest {
         // Multiple matches
         sandbox.files().write(List.of(
                 WriteEntry.builder().path(testDir1 + "/multi.txt").data("foo bar foo baz foo").build()));
-        var multiResults = sandbox.files().replaceContents(List.of(
+        var multiResults = sandbox.files().replaceContentsDetailed(List.of(
                 ContentReplaceEntry.builder()
                         .path(testDir1 + "/multi.txt")
                         .oldContent("foo")

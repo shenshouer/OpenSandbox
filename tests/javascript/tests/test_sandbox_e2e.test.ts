@@ -906,7 +906,7 @@ test("03 filesystem operations: CRUD + replace/move/delete + range + stream", as
   expect(await sandbox.files.readFile(file2)).toBe(updated2);
 
   await new Promise((r) => setTimeout(r, 50));
-  const replaceResults = await sandbox.files.replaceContents([
+  const replaceResults = await sandbox.files.replaceContentsDetailed([
     {
       path: file1,
       oldContent: "Appended line to file1",
@@ -921,7 +921,7 @@ test("03 filesystem operations: CRUD + replace/move/delete + range + stream", as
   expect(replaced.includes("Appended line to file1")).toBe(false);
 
   // Replace with no match (replacedCount=0)
-  const noMatchResults = await sandbox.files.replaceContents([
+  const noMatchResults = await sandbox.files.replaceContentsDetailed([
     { path: file1, oldContent: "this string does not exist", newContent: "irrelevant" },
   ]);
   expect(noMatchResults.length).toBe(1);
@@ -932,7 +932,7 @@ test("03 filesystem operations: CRUD + replace/move/delete + range + stream", as
   // Replace with multiple matches (replacedCount>1)
   const multiFile = `${dir1}/multi_match.txt`;
   await sandbox.files.writeFiles([{ path: multiFile, data: "foo bar foo baz foo" }]);
-  const multiResults = await sandbox.files.replaceContents([
+  const multiResults = await sandbox.files.replaceContentsDetailed([
     { path: multiFile, oldContent: "foo", newContent: "qux" },
   ]);
   expect(multiResults.length).toBe(1);
@@ -946,7 +946,7 @@ test("03 filesystem operations: CRUD + replace/move/delete + range + stream", as
     { path: batchA, data: "hello world" },
     { path: batchB, data: "hello hello" },
   ]);
-  const batchResults = await sandbox.files.replaceContents([
+  const batchResults = await sandbox.files.replaceContentsDetailed([
     { path: batchA, oldContent: "hello", newContent: "hi" },
     { path: batchB, oldContent: "hello", newContent: "hi" },
   ]);

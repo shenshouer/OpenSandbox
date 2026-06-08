@@ -1496,7 +1496,7 @@ class TestSandboxE2E:
         _assert_modified_updated(before_replace_info.modified_at, after_replace_info.modified_at, min_delta_ms=1)
 
         logger.info("Step 8a: Replace with no match (replacedCount=0)")
-        no_match_results = await sandbox.files.replace_contents([
+        no_match_results = await sandbox.files.replace_contents_detailed([
             ContentReplaceEntry(
                 path=test_file1,
                 old_content="this string does not exist in file",
@@ -1511,7 +1511,7 @@ class TestSandboxE2E:
         logger.info("Step 8b: Replace with multiple matches (replacedCount>1)")
         multi_match_file = f"{test_dir1}/multi_match.txt"
         await sandbox.files.write_files([WriteEntry(path=multi_match_file, data="foo bar foo baz foo")])
-        multi_results = await sandbox.files.replace_contents([
+        multi_results = await sandbox.files.replace_contents_detailed([
             ContentReplaceEntry(path=multi_match_file, old_content="foo", new_content="qux")
         ])
         assert len(multi_results) == 1
@@ -1525,7 +1525,7 @@ class TestSandboxE2E:
             WriteEntry(path=batch_file_a, data="hello world"),
             WriteEntry(path=batch_file_b, data="hello hello"),
         ])
-        batch_results = await sandbox.files.replace_contents([
+        batch_results = await sandbox.files.replace_contents_detailed([
             ContentReplaceEntry(path=batch_file_a, old_content="hello", new_content="hi"),
             ContentReplaceEntry(path=batch_file_b, old_content="hello", new_content="hi"),
         ])

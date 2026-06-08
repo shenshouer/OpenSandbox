@@ -1169,7 +1169,7 @@ class TestSandboxE2ESync:
         # Replace file contents via API (replace_contents)
         before_replace_info = after_update_info
         time.sleep(0.05)
-        replace_results = sandbox.files.replace_contents(
+        replace_results = sandbox.files.replace_contents_detailed(
             [
                 ContentReplaceEntry(
                     path=test_file1,
@@ -1188,7 +1188,7 @@ class TestSandboxE2ESync:
         _assert_modified_updated(before_replace_info.modified_at, after_replace_info.modified_at, min_delta_ms=1)
 
         # Replace with no match (replacedCount=0)
-        no_match_results = sandbox.files.replace_contents([
+        no_match_results = sandbox.files.replace_contents_detailed([
             ContentReplaceEntry(
                 path=test_file1,
                 old_content="this string does not exist in file",
@@ -1203,7 +1203,7 @@ class TestSandboxE2ESync:
         # Replace with multiple matches (replacedCount>1)
         multi_match_file = f"{test_dir1}/multi_match.txt"
         sandbox.files.write_files([WriteEntry(path=multi_match_file, data="foo bar foo baz foo")])
-        multi_results = sandbox.files.replace_contents([
+        multi_results = sandbox.files.replace_contents_detailed([
             ContentReplaceEntry(path=multi_match_file, old_content="foo", new_content="qux")
         ])
         assert len(multi_results) == 1
@@ -1217,7 +1217,7 @@ class TestSandboxE2ESync:
             WriteEntry(path=batch_file_a, data="hello world"),
             WriteEntry(path=batch_file_b, data="hello hello"),
         ])
-        batch_results = sandbox.files.replace_contents([
+        batch_results = sandbox.files.replace_contents_detailed([
             ContentReplaceEntry(path=batch_file_a, old_content="hello", new_content="hi"),
             ContentReplaceEntry(path=batch_file_b, old_content="hello", new_content="hi"),
         ])
