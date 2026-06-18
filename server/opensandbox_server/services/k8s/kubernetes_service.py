@@ -423,16 +423,16 @@ class KubernetesSandboxService(K8sDiagnosticsMixin, SandboxService, ExtensionSer
         sandbox_id = self.generate_sandbox_id()
 
         created_at = datetime.now(timezone.utc)
-        context = _build_create_workload_context(
-            app_config=self.app_config,
-            request=request,
-            sandbox_id=sandbox_id,
-            created_at=created_at,
-            egress_token_factory=generate_egress_token,
-            secure_access_token_factory=generate_secure_access_token,
-        )
-        
+
         try:
+            context = _build_create_workload_context(
+                app_config=self.app_config,
+                request=request,
+                sandbox_id=sandbox_id,
+                created_at=created_at,
+                egress_token_factory=generate_egress_token,
+                secure_access_token_factory=generate_secure_access_token,
+            )
             apply_access_renew_extend_seconds_to_mapping(context.annotations, request.extensions)
             apply_extensions_to_annotations(context.annotations, request.extensions)
 
@@ -453,7 +453,7 @@ class KubernetesSandboxService(K8sDiagnosticsMixin, SandboxService, ExtensionSer
                 namespace=self.namespace,
                 image_spec=request.image,
                 entrypoint=request.entrypoint,
-                env=request.env or {},
+                env=context.sandbox_env,
                 resource_limits=context.resource_limits,
                 resource_requests=context.resource_requests or None,
                 labels=context.labels,
@@ -466,6 +466,7 @@ class KubernetesSandboxService(K8sDiagnosticsMixin, SandboxService, ExtensionSer
                 egress_auth_token=context.egress_auth_token,
                 egress_mode=context.egress_mode,
                 credential_proxy_enabled=context.credential_proxy_enabled,
+                egress_env=context.egress_env,
                 volumes=request.volumes,
                 platform=request.platform,
             )
