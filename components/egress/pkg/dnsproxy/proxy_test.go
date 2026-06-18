@@ -82,6 +82,44 @@ func TestExtractResolvedIPs_EmptyOrNil(t *testing.T) {
 	require.Nil(t, extractResolvedIPs(msg), "CNAME only: expected nil")
 }
 
+func TestForwardAddsEDNS0BufferSize(t *testing.T) {
+	conn, err := net.ListenPacket("udp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+
+	seen := make(chan uint16, 1)
+	server := &dns.Server{
+		PacketConn: conn,
+		Handler: dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {
+			opt := r.IsEdns0()
+			require.NotNil(t, opt)
+			seen <- opt.UDPSize()
+
+			resp := new(dns.Msg)
+			resp.SetReply(r)
+			resp.Answer = []dns.RR{
+				&dns.A{Hdr: dns.RR_Header{Name: "example.com.", Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60}, A: net.ParseIP("1.2.3.4")},
+			}
+			_ = w.WriteMsg(resp)
+		}),
+	}
+	go func() { _ = server.ActivateAndServe() }()
+	t.Cleanup(func() { _ = server.Shutdown() })
+
+	proxy := &Proxy{
+		upstreams:               []string{conn.LocalAddr().String()},
+		activeUpstreams:         []string{conn.LocalAddr().String()},
+		upstreamExchangeTimeout: time.Second,
+	}
+	query := new(dns.Msg)
+	query.SetQuestion("example.com.", dns.TypeA)
+
+	resp, err := proxy.forward(query)
+	require.NoError(t, err)
+	require.Len(t, resp.Answer, 1)
+	require.Equal(t, uint16(4096), <-seen)
+}
+
 func TestSetOnResolved(t *testing.T) {
 	proxy, err := New(policy.DefaultDenyPolicy(), "", nil, nil)
 	require.NoError(t, err)

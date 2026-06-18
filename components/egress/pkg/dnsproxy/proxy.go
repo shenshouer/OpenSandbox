@@ -234,11 +234,16 @@ func (p *Proxy) forward(r *dns.Msg) (*dns.Msg, error) {
 	list := p.forwardUpstreams()
 	var lastErr error
 	for _, upstream := range list {
+		query := r.Copy()
+		if query.IsEdns0() == nil {
+			query.SetEdns0(4096, false)
+		}
 		c := &dns.Client{
 			Timeout: p.upstreamExchangeTimeout,
 			Dialer:  p.dialerForUpstream(upstream),
+			UDPSize: 4096,
 		}
-		resp, _, err := c.Exchange(r, upstream)
+		resp, _, err := c.Exchange(query, upstream)
 		if err != nil {
 			lastErr = err
 			log.Warnf("[dns] upstream %s exchange error: %v", upstream, err)
