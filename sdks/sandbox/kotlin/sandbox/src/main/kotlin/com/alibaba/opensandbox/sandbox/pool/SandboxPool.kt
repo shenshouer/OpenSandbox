@@ -603,7 +603,18 @@ class SandboxPool internal constructor(
                     skipHealthCheck = config.acquireSkipHealthCheck,
                     customHealthCheck = config.acquireHealthCheck,
                 )
-            sandboxTimeout?.let { timeout -> sandbox.renew(timeout) }
+            sandboxTimeout?.let { timeout ->
+                try {
+                    sandbox.renew(timeout)
+                } catch (e: Exception) {
+                    try {
+                        sandbox.kill()
+                    } finally {
+                        sandbox.close()
+                    }
+                    throw e
+                }
+            }
             return sandbox
         }
 
@@ -637,23 +648,13 @@ class SandboxPool internal constructor(
                 ownerId = config.ownerId,
                 idleTimeout = idleTimeout,
                 reason = reason,
+                readyTimeout = readyTimeout,
+                healthCheckPollingInterval = healthCheckPollingInterval,
+                skipHealthCheck = skipHealthCheck,
+                healthCheck = customHealthCheck,
                 connectionConfig = connectionConfig,
             )
-        val sandboxId = creator.create(context)
-        try {
-            return Sandbox.connector()
-                .sandboxId(sandboxId)
-                .connectTimeout(readyTimeout)
-                .healthCheckPollingInterval(healthCheckPollingInterval)
-                .skipHealthCheck(skipHealthCheck)
-                .connectionConfig(connectionConfig)
-                .run {
-                    customHealthCheck?.let { healthCheck(it) } ?: this
-                }.connect()
-        } catch (e: Exception) {
-            killSandboxBestEffort(sandboxId)
-            throw e
-        }
+        return creator.create(context)
     }
 
     private fun killSandboxBestEffort(sandboxId: String) {

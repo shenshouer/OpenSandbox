@@ -82,11 +82,11 @@ class SandboxPoolSync:
         idle_timeout: timedelta = timedelta(hours=24),
         drain_timeout: timedelta = timedelta(seconds=30),
         acquire_min_remaining_ttl: timedelta | None = None,
-        sandbox_creator: PooledSandboxCreator | None = None,
         sandbox_manager_factory: Callable[
             [ConnectionConfigSync], SandboxManagerSync
         ] = SandboxManagerSync.create,
         sandbox_factory: type[SandboxSync] = SandboxSync,
+        sandbox_creator: PooledSandboxCreator | None = None,
     ) -> None:
         self._config = PoolConfig(
             pool_name=pool_name,
@@ -509,21 +509,13 @@ class SandboxPoolSync:
             owner_id=str(self._config.owner_id),
             idle_timeout=self._config.idle_timeout,
             reason=reason,
+            ready_timeout=ready_timeout,
+            health_check_polling_interval=health_check_polling_interval,
+            skip_health_check=skip_health_check,
+            health_check=health_check,
             connection_config=self._connection_for_pool_resource(),
         )
-        sandbox_id = creator(context)
-        try:
-            return self._sandbox_factory.connect(
-                sandbox_id,
-                connection_config=self._connection_for_pool_resource(),
-                health_check=health_check,
-                connect_timeout=ready_timeout,
-                health_check_polling_interval=health_check_polling_interval,
-                skip_health_check=skip_health_check,
-            )
-        except Exception:
-            self._kill_sandbox_best_effort(sandbox_id)
-            raise
+        return creator(context)
 
     def _resolve_max_idle(self) -> int:
         shared = self._state_store.get_max_idle(self._config.pool_name)

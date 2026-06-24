@@ -16,12 +16,15 @@
 
 package com.alibaba.opensandbox.sandbox.domain.pool
 
+import com.alibaba.opensandbox.sandbox.Sandbox
+
 /**
- * Creates a sandbox for the pool and returns its sandbox id.
+ * Creates a sandbox for the pool.
  *
- * The pool continues to own readiness checks, warmup preparation, idle membership, renew,
- * and cleanup. Implementations should only create the sandbox and return its id.
+ * The pool continues to own warmup preparation, idle membership, renew, and cleanup.
+ * Implementations should create and return a usable [Sandbox], applying the readiness
+ * options supplied in [PooledSandboxCreateContext] when applicable.
  */
 fun interface PooledSandboxCreator {
-    fun create(context: PooledSandboxCreateContext): String
+    fun create(context: PooledSandboxCreateContext): Sandbox
 }

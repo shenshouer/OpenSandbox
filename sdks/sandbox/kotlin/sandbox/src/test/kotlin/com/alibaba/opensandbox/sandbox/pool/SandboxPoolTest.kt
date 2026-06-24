@@ -504,7 +504,7 @@ class SandboxPoolTest {
     @Test
     fun `sandbox pool builder forwards acquire readiness settings into config`() {
         val healthCheck: (Sandbox) -> Boolean = { true }
-        val sandboxCreator = PooledSandboxCreator { "sandbox-id" }
+        val sandboxCreator = PooledSandboxCreator { mockk<Sandbox>() }
         val pool =
             SandboxPool.builder()
                 .poolName("test-pool")
@@ -571,6 +571,39 @@ class SandboxPoolTest {
             assertEquals(3, store.maxIdleByPool["test-pool"])
             assertEquals(listOf("test-pool" to 3), store.setMaxIdleCalls)
             assertEquals(3, pool.snapshot().maxIdle)
+        } finally {
+            pool.shutdown(graceful = false)
+        }
+    }
+
+    @Test
+    fun `custom direct create kills and closes when renew fails`() {
+        val sandbox = mockk<Sandbox>()
+        every { sandbox.renew(Duration.ofMinutes(5)) } throws RuntimeException("renew failed")
+        every { sandbox.kill() } just runs
+        every { sandbox.close() } just runs
+
+        val pool =
+            SandboxPool.builder()
+                .poolName("test-pool")
+                .ownerId("test-owner")
+                .maxIdle(0)
+                .stateStore(InMemoryPoolStateStore())
+                .connectionConfig(ConnectionConfig.builder().build())
+                .creationSpec(PoolCreationSpec.builder().image("ubuntu:22.04").build())
+                .sandboxCreator(PooledSandboxCreator { sandbox })
+                .drainTimeout(Duration.ofMillis(50))
+                .reconcileInterval(Duration.ofSeconds(30))
+                .build()
+        pool.start()
+
+        try {
+            assertThrows(RuntimeException::class.java) {
+                pool.acquire(Duration.ofMinutes(5))
+            }
+
+            verify(exactly = 1) { sandbox.kill() }
+            verify(exactly = 1) { sandbox.close() }
         } finally {
             pool.shutdown(graceful = false)
         }

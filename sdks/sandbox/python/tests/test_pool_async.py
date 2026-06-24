@@ -157,19 +157,10 @@ async def test_async_acquire_direct_create_kills_and_closes_when_renew_fails() -
 @pytest.mark.asyncio
 async def test_async_acquire_direct_create_uses_sandbox_creator() -> None:
     contexts: list[PooledSandboxCreateContext] = []
-    connected_kwargs: dict[str, Any] = {}
 
-    class CapturingAsyncSandbox(FakeAsyncSandbox):
-        @classmethod
-        async def connect(
-            cls, sandbox_id: str, *args: Any, **kwargs: Any
-        ) -> CapturingAsyncSandbox:
-            connected_kwargs.update(kwargs)
-            return cls(sandbox_id)
-
-    async def creator(context: PooledSandboxCreateContext) -> str:
+    async def creator(context: PooledSandboxCreateContext) -> FakeAsyncSandbox:
         contexts.append(context)
-        return "created-by-hook"
+        return FakeAsyncSandbox("created-by-hook")
 
     pool = SandboxPoolAsync(
         pool_name="pool",
@@ -181,12 +172,12 @@ async def test_async_acquire_direct_create_uses_sandbox_creator() -> None:
         idle_timeout=timedelta(minutes=10),
         sandbox_creator=creator,
         sandbox_manager_factory=lambda config: _manager_factory(FakeAsyncManager()),
-        sandbox_factory=CapturingAsyncSandbox,  # type: ignore[arg-type]
+        sandbox_factory=FakeAsyncSandbox,  # type: ignore[arg-type]
     )
     await pool.start()
     try:
         sandbox = await pool.acquire(sandbox_timeout=timedelta(minutes=5))
-        fake_sandbox = cast(CapturingAsyncSandbox, sandbox)
+        fake_sandbox = cast(FakeAsyncSandbox, sandbox)
 
         assert sandbox.id == "created-by-hook"
         assert fake_sandbox.renewed == [timedelta(minutes=5)]
@@ -195,9 +186,14 @@ async def test_async_acquire_direct_create_uses_sandbox_creator() -> None:
         assert contexts[0].owner_id == "owner-1"
         assert contexts[0].idle_timeout == timedelta(minutes=10)
         assert contexts[0].reason is PooledSandboxCreateReason.DIRECT_CREATE
+        assert contexts[0].ready_timeout == pool._config.acquire_ready_timeout
+        assert (
+            contexts[0].health_check_polling_interval
+            == pool._config.acquire_health_check_polling_interval
+        )
+        assert contexts[0].skip_health_check is False
+        assert contexts[0].health_check is None
         assert isinstance(contexts[0].connection_config, ConnectionConfig)
-        assert connected_kwargs["connect_timeout"] == pool._config.acquire_ready_timeout
-        assert connected_kwargs["skip_health_check"] is False
     finally:
         await pool.shutdown(False)
 

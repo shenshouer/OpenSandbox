@@ -175,19 +175,10 @@ def test_acquire_direct_create_kills_and_closes_when_renew_fails() -> None:
 
 def test_acquire_direct_create_uses_sandbox_creator() -> None:
     contexts: list[PooledSandboxCreateContext] = []
-    connected_kwargs: dict[str, Any] = {}
 
-    class CapturingSandbox(FakeSandbox):
-        @classmethod
-        def connect(
-            cls, sandbox_id: str, *args: Any, **kwargs: Any
-        ) -> CapturingSandbox:
-            connected_kwargs.update(kwargs)
-            return cls(sandbox_id)
-
-    def creator(context: PooledSandboxCreateContext) -> str:
+    def creator(context: PooledSandboxCreateContext) -> FakeSandbox:
         contexts.append(context)
-        return "created-by-hook"
+        return FakeSandbox("created-by-hook")
 
     pool = SandboxPoolSync(
         pool_name="pool",
@@ -199,12 +190,12 @@ def test_acquire_direct_create_uses_sandbox_creator() -> None:
         idle_timeout=timedelta(minutes=10),
         sandbox_creator=creator,
         sandbox_manager_factory=lambda config: FakeManager(),  # type: ignore[arg-type,return-value]
-        sandbox_factory=CapturingSandbox,  # type: ignore[arg-type]
+        sandbox_factory=FakeSandbox,  # type: ignore[arg-type]
     )
     pool.start()
     try:
         sandbox = pool.acquire(sandbox_timeout=timedelta(minutes=5))
-        fake_sandbox = cast(CapturingSandbox, sandbox)
+        fake_sandbox = cast(FakeSandbox, sandbox)
 
         assert sandbox.id == "created-by-hook"
         assert fake_sandbox.renewed == [timedelta(minutes=5)]
@@ -213,9 +204,14 @@ def test_acquire_direct_create_uses_sandbox_creator() -> None:
         assert contexts[0].owner_id == "owner-1"
         assert contexts[0].idle_timeout == timedelta(minutes=10)
         assert contexts[0].reason is PooledSandboxCreateReason.DIRECT_CREATE
+        assert contexts[0].ready_timeout == pool._config.acquire_ready_timeout
+        assert (
+            contexts[0].health_check_polling_interval
+            == pool._config.acquire_health_check_polling_interval
+        )
+        assert contexts[0].skip_health_check is False
+        assert contexts[0].health_check is None
         assert isinstance(contexts[0].connection_config, ConnectionConfigSync)
-        assert connected_kwargs["connect_timeout"] == pool._config.acquire_ready_timeout
-        assert connected_kwargs["skip_health_check"] is False
     finally:
         pool.shutdown(False)
 

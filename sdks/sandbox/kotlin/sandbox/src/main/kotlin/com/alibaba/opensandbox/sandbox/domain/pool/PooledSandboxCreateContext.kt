@@ -16,6 +16,7 @@
 
 package com.alibaba.opensandbox.sandbox.domain.pool
 
+import com.alibaba.opensandbox.sandbox.Sandbox
 import com.alibaba.opensandbox.sandbox.config.ConnectionConfig
 import java.time.Duration
 
@@ -26,6 +27,10 @@ import java.time.Duration
  * @property ownerId Current pool owner identity.
  * @property idleTimeout Pool idle timeout to apply to the newly created sandbox.
  * @property reason Why the pool is creating a sandbox.
+ * @property readyTimeout Max time to wait for the created sandbox to become ready.
+ * @property healthCheckPollingInterval Poll interval while waiting for readiness.
+ * @property skipHealthCheck Whether readiness checks should be skipped for this creation.
+ * @property healthCheck Optional custom health check for the created sandbox.
  * @property connectionConfig Connection config for lifecycle API calls.
  */
 class PooledSandboxCreateContext internal constructor(
@@ -33,6 +38,10 @@ class PooledSandboxCreateContext internal constructor(
     val ownerId: String,
     val idleTimeout: Duration,
     val reason: Reason,
+    val readyTimeout: Duration,
+    val healthCheckPollingInterval: Duration,
+    val skipHealthCheck: Boolean,
+    val healthCheck: ((Sandbox) -> Boolean)?,
     val connectionConfig: ConnectionConfig,
 ) {
     enum class Reason {

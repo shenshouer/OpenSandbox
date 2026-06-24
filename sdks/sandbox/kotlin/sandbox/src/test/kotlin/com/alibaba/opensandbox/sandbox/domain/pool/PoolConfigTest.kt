@@ -19,6 +19,7 @@ package com.alibaba.opensandbox.sandbox.domain.pool
 import com.alibaba.opensandbox.sandbox.Sandbox
 import com.alibaba.opensandbox.sandbox.config.ConnectionConfig
 import com.alibaba.opensandbox.sandbox.infrastructure.pool.InMemoryPoolStateStore
+import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertSame
@@ -56,7 +57,7 @@ class PoolConfigTest {
     fun `build keeps configured warmup readiness settings`() {
         val healthCheck: (Sandbox) -> Boolean = { true }
         val preparer = SandboxPreparer {}
-        val sandboxCreator = PooledSandboxCreator { "sandbox-id" }
+        val sandboxCreator = PooledSandboxCreator { mockk<Sandbox>() }
         val config =
             PoolConfig.builder()
                 .poolName("test-pool")

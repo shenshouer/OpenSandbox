@@ -83,11 +83,11 @@ class SandboxPoolAsync:
         idle_timeout: timedelta = timedelta(hours=24),
         drain_timeout: timedelta = timedelta(seconds=30),
         acquire_min_remaining_ttl: timedelta | None = None,
-        sandbox_creator: AsyncPooledSandboxCreator | None = None,
         sandbox_manager_factory: Callable[
             [ConnectionConfig], Awaitable[SandboxManager]
         ] = SandboxManager.create,
         sandbox_factory: type[Sandbox] = Sandbox,
+        sandbox_creator: AsyncPooledSandboxCreator | None = None,
     ) -> None:
         self._config = AsyncPoolConfig(
             pool_name=pool_name,
@@ -522,21 +522,13 @@ class SandboxPoolAsync:
             owner_id=str(self._config.owner_id),
             idle_timeout=self._config.idle_timeout,
             reason=reason,
+            ready_timeout=ready_timeout,
+            health_check_polling_interval=health_check_polling_interval,
+            skip_health_check=skip_health_check,
+            health_check=health_check,
             connection_config=self._connection_for_pool_resource(),
         )
-        sandbox_id = await creator(context)
-        try:
-            return await self._sandbox_factory.connect(
-                sandbox_id,
-                connection_config=self._connection_for_pool_resource(),
-                health_check=health_check,
-                connect_timeout=ready_timeout,
-                health_check_polling_interval=health_check_polling_interval,
-                skip_health_check=skip_health_check,
-            )
-        except Exception:
-            await self._kill_sandbox_best_effort(sandbox_id)
-            raise
+        return await creator(context)
 
     async def _resolve_max_idle(self) -> int:
         shared = await self._state_store.get_max_idle(self._config.pool_name)

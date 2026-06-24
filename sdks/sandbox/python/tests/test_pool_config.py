@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import inspect
 from datetime import timedelta
 
 import pytest
@@ -30,7 +31,11 @@ from opensandbox.pool import (
     PoolConfig,
     PoolCreationSpec,
     PooledSandboxCreateContext,
+    SandboxPoolAsync,
 )
+from opensandbox.sandbox import Sandbox
+from opensandbox.sync.pool import SandboxPoolSync
+from opensandbox.sync.sandbox import SandboxSync
 
 
 def _sync_kwargs() -> dict[str, object]:
@@ -119,9 +124,57 @@ def test_zero_acquire_min_remaining_ttl_opts_out() -> None:
     assert config.acquire_min_remaining_ttl == timedelta(0)
 
 
+def test_sync_pool_config_positional_owner_id_stays_compatible() -> None:
+    kwargs = _sync_kwargs()
+
+    config = PoolConfig(
+        kwargs["pool_name"],  # type: ignore[arg-type]
+        kwargs["max_idle"],  # type: ignore[arg-type]
+        kwargs["state_store"],  # type: ignore[arg-type]
+        kwargs["connection_config"],  # type: ignore[arg-type]
+        kwargs["creation_spec"],  # type: ignore[arg-type]
+        "owner-1",
+    )
+
+    assert config.owner_id == "owner-1"
+    assert config.sandbox_creator is None
+
+
+def test_async_pool_config_positional_owner_id_stays_compatible() -> None:
+    kwargs = _async_kwargs()
+
+    config = AsyncPoolConfig(
+        kwargs["pool_name"],  # type: ignore[arg-type]
+        kwargs["max_idle"],  # type: ignore[arg-type]
+        kwargs["state_store"],  # type: ignore[arg-type]
+        kwargs["connection_config"],  # type: ignore[arg-type]
+        kwargs["creation_spec"],  # type: ignore[arg-type]
+        "owner-1",
+    )
+
+    assert config.owner_id == "owner-1"
+    assert config.sandbox_creator is None
+
+
+def test_pool_facade_sandbox_creator_is_appended_after_factories() -> None:
+    sync_params = list(inspect.signature(SandboxPoolSync).parameters)
+    async_params = list(inspect.signature(SandboxPoolAsync).parameters)
+
+    assert sync_params[-3:] == [
+        "sandbox_manager_factory",
+        "sandbox_factory",
+        "sandbox_creator",
+    ]
+    assert async_params[-3:] == [
+        "sandbox_manager_factory",
+        "sandbox_factory",
+        "sandbox_creator",
+    ]
+
+
 def test_sync_pool_config_keeps_sandbox_creator() -> None:
-    def creator(_context: PooledSandboxCreateContext) -> str:
-        return "created-by-hook"
+    def creator(_context: PooledSandboxCreateContext) -> SandboxSync:
+        raise AssertionError("not called")
 
     config = PoolConfig(
         **_sync_kwargs(),  # type: ignore[arg-type]
@@ -132,8 +185,8 @@ def test_sync_pool_config_keeps_sandbox_creator() -> None:
 
 
 def test_async_pool_config_keeps_sandbox_creator() -> None:
-    async def creator(_context: PooledSandboxCreateContext) -> str:
-        return "created-by-hook"
+    async def creator(_context: PooledSandboxCreateContext) -> Sandbox:
+        raise AssertionError("not called")
 
     config = AsyncPoolConfig(
         **_async_kwargs(),  # type: ignore[arg-type]

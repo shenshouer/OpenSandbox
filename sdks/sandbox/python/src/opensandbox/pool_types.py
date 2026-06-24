@@ -110,19 +110,25 @@ class PooledSandboxCreateContext:
     owner_id: str
     idle_timeout: timedelta
     reason: PooledSandboxCreateReason
+    ready_timeout: timedelta
+    health_check_polling_interval: timedelta
+    skip_health_check: bool
+    health_check: (
+        Callable[[SandboxSync], bool] | Callable[[Sandbox], Awaitable[bool]] | None
+    )
     connection_config: ConnectionConfigSync | ConnectionConfig
 
 
 class PooledSandboxCreator(Protocol):
-    """Creates a sandbox for the pool and returns its sandbox id."""
+    """Creates a sandbox for the pool."""
 
-    def __call__(self, context: PooledSandboxCreateContext) -> str: ...
+    def __call__(self, context: PooledSandboxCreateContext) -> SandboxSync: ...
 
 
 class AsyncPooledSandboxCreator(Protocol):
     """Async counterpart of :class:`PooledSandboxCreator`."""
 
-    async def __call__(self, context: PooledSandboxCreateContext) -> str: ...
+    async def __call__(self, context: PooledSandboxCreateContext) -> Sandbox: ...
 
 
 @dataclass(frozen=True)
@@ -232,7 +238,6 @@ class PoolConfig:
     state_store: PoolStateStore
     connection_config: ConnectionConfigSync
     creation_spec: PoolCreationSpec
-    sandbox_creator: PooledSandboxCreator | None = None
     owner_id: str | None = None
     warmup_concurrency: int | None = None
     primary_lock_ttl: timedelta = timedelta(seconds=60)
@@ -250,6 +255,7 @@ class PoolConfig:
     idle_timeout: timedelta = timedelta(hours=24)
     drain_timeout: timedelta = timedelta(seconds=30)
     acquire_min_remaining_ttl: timedelta | None = None
+    sandbox_creator: PooledSandboxCreator | None = None
 
     def __post_init__(self) -> None:
         owner_id = self.owner_id or f"pool-owner-{uuid4()}"
@@ -307,7 +313,6 @@ class AsyncPoolConfig:
     state_store: AsyncPoolStateStore
     connection_config: ConnectionConfig
     creation_spec: PoolCreationSpec
-    sandbox_creator: AsyncPooledSandboxCreator | None = None
     owner_id: str | None = None
     warmup_concurrency: int | None = None
     primary_lock_ttl: timedelta = timedelta(seconds=60)
@@ -325,6 +330,7 @@ class AsyncPoolConfig:
     idle_timeout: timedelta = timedelta(hours=24)
     drain_timeout: timedelta = timedelta(seconds=30)
     acquire_min_remaining_ttl: timedelta | None = None
+    sandbox_creator: AsyncPooledSandboxCreator | None = None
 
     def __post_init__(self) -> None:
         owner_id = self.owner_id or f"pool-owner-{uuid4()}"
