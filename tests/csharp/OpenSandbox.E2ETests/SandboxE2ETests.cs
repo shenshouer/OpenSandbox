@@ -111,7 +111,7 @@ public class SandboxE2ETests : IClassFixture<SandboxE2ETestFixture>
         }
         finally
         {
-            try { await sandbox.KillAsync(); } catch { }
+            try { await sandbox.KillAsync(); } catch (SandboxApiException) { }
             await sandbox.DisposeAsync();
         }
     }
