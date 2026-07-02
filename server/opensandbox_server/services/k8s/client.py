@@ -36,6 +36,7 @@ OPENSANDBOX_API_GROUP = "sandbox.opensandbox.io"
 OPENSANDBOX_API_VERSION = "v1alpha1"
 POOL_KIND = "Pool"
 POOL_PLURAL = "pools"
+POOL_AUTO_ASSIGN_REF = "*"
 
 _InformerKey = Tuple[str, str, str, str]  # (group, version, plural, namespace)
 

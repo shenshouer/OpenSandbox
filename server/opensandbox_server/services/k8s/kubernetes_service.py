@@ -93,6 +93,7 @@ from opensandbox_server.services.k8s.client import (
     K8sClient,
     OPENSANDBOX_API_GROUP,
     OPENSANDBOX_API_VERSION,
+    POOL_AUTO_ASSIGN_REF,
     POOL_PLURAL,
 )
 from opensandbox_server.services.k8s.provider_factory import create_workload_provider
@@ -738,7 +739,7 @@ class KubernetesSandboxService(K8sDiagnosticsMixin, SandboxService, ExtensionSer
                     },
                 )
 
-            if has_pool_ref:
+            if has_pool_ref and pool_ref != POOL_AUTO_ASSIGN_REF:
                 await asyncio.to_thread(self._ensure_pool_ref_exists, pool_ref)
 
             # Auto-create PVCs that don't exist yet
