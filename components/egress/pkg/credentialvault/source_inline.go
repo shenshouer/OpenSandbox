@@ -15,6 +15,7 @@
 package credentialvault
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -29,12 +30,16 @@ func (s *inlineSource) Resolve(_ context.Context) (string, error) { return s.val
 
 // inlineSourceFactory creates an inlineSource from the raw JSON "source"
 // object. Expected shape: {"type": "inline", "value": "<secret>"}.
+// Unknown fields are rejected to match the OpenAPI additionalProperties: false
+// contract.
 func inlineSourceFactory(raw json.RawMessage) (CredentialSource, error) {
 	var src struct {
 		Type  string `json:"type"`
 		Value string `json:"value"`
 	}
-	if err := json.Unmarshal(raw, &src); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&src); err != nil {
 		return nil, fmt.Errorf("parse inline credential source: %w", err)
 	}
 	if src.Value == "" {
