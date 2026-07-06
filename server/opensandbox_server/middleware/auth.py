@@ -79,7 +79,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if any(request.url.path.startswith(path) for path in self.EXEMPT_PATHS):
             return await call_next(request)
 
-        if self._is_proxy_path(request.url.path):
+        if self._is_proxy_path(request.url.path) and not self._is_multi_tenant:
             return await call_next(request)
 
         # If no API keys configured AND no tenant provider → skip auth
