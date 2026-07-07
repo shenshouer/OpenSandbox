@@ -16,7 +16,9 @@
 
 package com.alibaba.opensandbox.sandbox.infrastructure.pool
 
+import com.alibaba.opensandbox.sandbox.domain.exceptions.PoolDestroyedException
 import com.alibaba.opensandbox.sandbox.domain.pool.IdleEntry
+import com.alibaba.opensandbox.sandbox.domain.pool.PoolDestroyState
 import com.alibaba.opensandbox.sandbox.domain.pool.PoolStateStore
 import com.alibaba.opensandbox.sandbox.domain.pool.StoreCounters
 import com.alibaba.opensandbox.sandbox.domain.pool.TakeIdleResult
@@ -40,6 +42,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 class InMemoryPoolStateStore : PoolStateStore {
     private val defaultIdleTtl: Duration = Duration.ofHours(24)
     private val idleTtlByPool = ConcurrentHashMap<String, Duration>()
+    private val destroyStateByPool = ConcurrentHashMap<String, DestroyStateEntry>()
 
     /** Per pool: (map = sandboxId -> entry for idempotent put + expiry, queue = FIFO order for take). */
     private val pools = ConcurrentHashMap<String, PoolIdleState>()
@@ -91,6 +94,7 @@ class InMemoryPoolStateStore : PoolStateStore {
         poolName: String,
         sandboxId: String,
     ) {
+        rejectIfDestroyed(poolName)
         val state = pools.computeIfAbsent(poolName) { PoolIdleState() }
         val expiresAt = Instant.now().plus(resolveIdleTtl(poolName))
         val entry = IdleEntry(sandboxId, expiresAt)
@@ -112,6 +116,7 @@ class InMemoryPoolStateStore : PoolStateStore {
         ownerId: String,
         ttl: Duration,
     ): Boolean {
+        if (getDestroyState(poolName) != PoolDestroyState.ACTIVE) return false
         // Single-node: no real lock; always grant so reconcile runs.
         return true
     }
@@ -121,6 +126,7 @@ class InMemoryPoolStateStore : PoolStateStore {
         ownerId: String,
         ttl: Duration,
     ): Boolean {
+        if (getDestroyState(poolName) != PoolDestroyState.ACTIVE) return false
         // Single-node: no real lock; always succeed.
         return true
     }
@@ -188,6 +194,7 @@ class InMemoryPoolStateStore : PoolStateStore {
         poolName: String,
         maxIdle: Int,
     ) {
+        rejectIfDestroyed(poolName)
         // Single-node: no shared state; pool uses local currentMaxIdle.
     }
 
@@ -195,7 +202,44 @@ class InMemoryPoolStateStore : PoolStateStore {
         poolName: String,
         idleTtl: Duration,
     ) {
+        rejectIfDestroyed(poolName)
         idleTtlByPool[poolName] = validateIdleTtl(idleTtl)
+    }
+
+    override fun getDestroyState(poolName: String): PoolDestroyState {
+        val entry = destroyStateByPool[poolName] ?: return PoolDestroyState.ACTIVE
+        val expiresAt = entry.expiresAt
+        if (expiresAt != null && !expiresAt.isAfter(Instant.now())) {
+            destroyStateByPool.remove(poolName, entry)
+            return PoolDestroyState.ACTIVE
+        }
+        return entry.state
+    }
+
+    override fun beginDestroy(
+        poolName: String,
+        ownerId: String,
+        ttl: Duration,
+    ) {
+        require(ownerId.isNotBlank()) { "ownerId must not be blank" }
+        require(!ttl.isNegative && !ttl.isZero) { "ttl must be positive" }
+        destroyStateByPool[poolName] =
+            DestroyStateEntry(PoolDestroyState.DESTROYING, Instant.now().plus(ttl), ownerId)
+    }
+
+    override fun clearPoolState(poolName: String) {
+        pools.remove(poolName)
+        idleTtlByPool.remove(poolName)
+    }
+
+    override fun markDestroyed(
+        poolName: String,
+        ownerId: String,
+        tombstoneTtl: Duration?,
+    ) {
+        require(ownerId.isNotBlank()) { "ownerId must not be blank" }
+        val expiresAt = tombstoneTtl?.let { Instant.now().plus(it) }
+        destroyStateByPool[poolName] = DestroyStateEntry(PoolDestroyState.DESTROYED, expiresAt, ownerId)
     }
 
     private class PoolIdleState {
@@ -203,10 +247,23 @@ class InMemoryPoolStateStore : PoolStateStore {
         val queue = ConcurrentLinkedQueue<String>()
     }
 
+    private data class DestroyStateEntry(
+        val state: PoolDestroyState,
+        val expiresAt: Instant?,
+        val ownerId: String,
+    )
+
     private fun validateIdleTtl(idleTtl: Duration): Duration {
         require(!idleTtl.isNegative && !idleTtl.isZero) { "idleTtl must be positive" }
         return idleTtl
     }
 
     private fun resolveIdleTtl(poolName: String): Duration = idleTtlByPool[poolName] ?: defaultIdleTtl
+
+    private fun rejectIfDestroyed(poolName: String) {
+        val state = getDestroyState(poolName)
+        if (state != PoolDestroyState.ACTIVE) {
+            throw PoolDestroyedException("Pool namespace is $state: poolName=$poolName")
+        }
+    }
 }

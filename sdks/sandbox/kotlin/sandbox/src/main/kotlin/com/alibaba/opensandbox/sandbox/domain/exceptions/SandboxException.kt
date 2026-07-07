@@ -178,6 +178,18 @@ class PoolNotRunningException(
     )
 
 /**
+ * Thrown when a pool namespace is being destroyed or has already been destroyed.
+ */
+class PoolDestroyedException(
+    message: String? = "Pool namespace is destroyed",
+    cause: Throwable? = null,
+) : SandboxException(
+        message = message,
+        cause = cause,
+        error = SandboxError(SandboxError.POOL_DESTROYED, message),
+    )
+
+/**
  * Defines standardized common error codes and messages for the Sandbox SDK.
  */
 data class SandboxError(
@@ -208,5 +220,8 @@ data class SandboxError(
 
         /** Pool is not in RUNNING state when acquire is requested. */
         const val POOL_NOT_RUNNING = "POOL_NOT_RUNNING"
+
+        /** Pool namespace is destroying or destroyed. */
+        const val POOL_DESTROYED = "POOL_DESTROYED"
     }
 }
